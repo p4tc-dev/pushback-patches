@@ -28,7 +28,9 @@ See for example *flower* in (**Figure 2**): https://github.com/p4tc-dev/docs/blo
 
 Notice in **Figure 1** illustrating P4TC: Either hardware or software datapath may be missing. eBPF is only used when we need a s/w datapath meaning that if one was only interested in h/w offload there would be no need to load the eBPF blobs. Likewise, as in all TC offloads, if your h/w doesnt support the equivalent h/w datapath then your driver will be lacking such support and reject any requests to offload; however, the <ins>same control path and object references are used for both h/w and s/w</ins>.
 
+<!--
 To provide extra comparison between P4TC (**Figure 1**) vs  other offload-capable classifiers like eg *matchall*, *u32* or *flower* (**Figure 2**): the *P4TC* s/w datapath is <ins>not hardcoded</ins>> in the kernel; in <ins>flower</ins> removing the s/w datapath(either by not compiling or unloading the *flower* kernel module) implies removing access to the h/w target. Other differences between P4TC and f.e *flower* is that in *P4TC* you could have <ins>infinite possible s/w and h/w datapaths</ins> whereas in *flower* the s/w datapath is hard-coded/fixed for both s/w and h/w. IOW, in P4TC you can describe a new datapath with new lookup approaches, new actions and datapath flow processing by writting a P4 program and then use the compiler to generate all the datapath and control glue (see the green color coding in **Figure 1**). Whereas in *flower* changing things even as trivial as a the lookup key requires not just changing the kernel s/w datapath for lookup and parsing, but also the driver, the control objects, netlink structure and user space code (iproute2, etc); and if you are to introduce a new action then you rinse and repeat that process. P4TC design intentionally avoids these code churns and brings a new way of thinking which highly reduces future kernel code maintanance.
+-->
 
 The posted series 1 patches[0] only introduce the <ins>s/w datapath as well as the necessary control objects</ins>. This is in conformance to the TC rule which states that: for TC datapaths which involve offloads it is required to introduce s/w twin before the h/w equivalent.
 
@@ -41,15 +43,15 @@ This has been brought up numerous times from all 3 people and here's a sample:[1
 
 If you look at **Figure 1** above you will notice it doesnt make sense for our requirement. 1) eBPF is only in the picture for s/w datapath and can be removed while the h/w datapath continues to work fine. The control path, which accesses the objects, is for both h/w and s/w. If an operator wants a total offload then they dont need to load eBPF. 2) P4 tables require a lot more features that are not natural for maps and P4 has a lot more objects than things that can be *squeezed* into maps.
 
-For this reason <ins>maps cannot be used</ins>.
+For these reasons <ins>maps cannot be used</ins>.
 
 #### 1b **Comment**: *"But there is already an eBPF P4 backend"*
 
 Raised by John, so reusing the same reference [1]
 
-Infact there is more than one eBPF backend for eBPF written.  We use one of them as a basis for our implementation.
+Infact there is more than one eBPF backend for P4 written.  We use one of those backends as a basis for our implementation.
 
-But: See **Figure 1** and then factor the sharing of the control path by s/w and h/w.
+But: See **Figure 1** and then factor the sharing of objects the control path by s/w and h/w (and their optional presence).
 
 <ins>None of the P4 eBPF outputs meet our requirement</ins>.
 
@@ -77,7 +79,7 @@ My response has always consistently been: performance is a lower priority to P4 
 
 If you kept up with the exchanges you will notice that this sentiment is a big theme in the exchanges and consumed most of the electrons!  The problem here is a lot of these strong opinions are being expressed as "expert opinions" when in fact it is just basic bikesheding[11].
 
-Some sample space:  A lot of sometimes downright insulting comments like [3], sometimes misleading statements like "use tcx"[2] or just a gut-feel opinions not based on any solid reasoning or experience like "disagree with pipeline design"[1]. Often when these statements were made we would invest time and investigate if we could somehow compromise and use the expressed ideas/opinions but often i turned out to be a wild good chase and often if we "resolve" that issues another one "do it this way" comes up. See **Section #4c** for the latest such commentary...
+Some sample space:  A lot of sometimes downright insulting comments like [3], sometimes misleading statements like "use tcx"[2] or just a gut-feel opinions not based on any solid reasoning or experience like "disagree with pipeline design"[1]. Often when these statements were made we would invest time and investigate if we could somehow compromise and use the expressed ideas/opinions but often it turned out to be a wild good chase and often if we  did "resolve" that "issue" another one "do it this way" comes up. See **Section #4c** for the a sample of such commentary...
 
 ## 4 **Comments** which bring us to the current stalemate...
 
@@ -122,9 +124,9 @@ If this nacks are to block these patches then we are in unprecedented cross-subs
 # How do we move forward?
 
 I am not asking to be given speacial treatment but it is clear we have a hole in the process currently. All i am asking for is fair treatment.
-At this point, given that Paolo says the patches cant be applied because of 3 cross-subsystem bogus nacks, my suggestion on how we resolve this is to appoint a third person arbitrator. This person cannot be part of the TC or eBPF collective and has to be agreed to by both parties.
+At this point, given that Paolo says the patches cant be applied because of 3 cross-subsystem <u>bogus</u> nacks, my suggestion on how we resolve this is for nnet maintainers to appoint a third person arbitrator. This person cannot be part of the TC or eBPF collective and has to be agreed to by both parties.
 
-Hopefully this will introduce some new set of rules that will help the maintainers resolve such issues should they surface in the future.
+Hopefully this will introduce some new set of rules that will help the net maintainers resolve such issues should they surface in the future.
 
 # References
 
