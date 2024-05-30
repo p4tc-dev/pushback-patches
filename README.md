@@ -14,7 +14,7 @@ Our requirement is to implement P4 for both a s/w and h/w datapaths and the TC m
 
  c) Netlink which provides a rich control interface that fits with P4 requirements for CRUD and event publish-subscribe semantics.
 
-IOW, we dont have to invent new approaches for match-action or control CRUD or event publish-subscribe (and many others).
+IOW, as noted above **TC meets our requirements** and avoids to have to invent new approaches for match-action tables or control CRUD or event publish-subscribe (and many others).
 
 ## P4TC Overview
 
@@ -32,16 +32,23 @@ Notice in **Figure 1** illustrating P4TC: Either hardware or software datapath m
 To provide extra comparison between P4TC (**Figure 1**) vs  other offload-capable classifiers like eg *matchall*, *u32* or *flower* (**Figure 2**): the *P4TC* s/w datapath is <ins>not hardcoded</ins>> in the kernel; in <ins>flower</ins> removing the s/w datapath(either by not compiling or unloading the *flower* kernel module) implies removing access to the h/w target. Other differences between P4TC and f.e *flower* is that in *P4TC* you could have <ins>infinite possible s/w and h/w datapaths</ins> whereas in *flower* the s/w datapath is hard-coded/fixed for both s/w and h/w. IOW, in P4TC you can describe a new datapath with new lookup approaches, new actions and datapath flow processing by writting a P4 program and then use the compiler to generate all the datapath and control glue (see the green color coding in **Figure 1**). Whereas in *flower* changing things even as trivial as a the lookup key requires not just changing the kernel s/w datapath for lookup and parsing, but also the driver, the control objects, netlink structure and user space code (iproute2, etc); and if you are to introduce a new action then you rinse and repeat that process. P4TC design intentionally avoids these code churns and brings a new way of thinking which highly reduces future kernel code maintanance.
 -->
 
-The posted series 1 patches[0] only introduce the <ins>s/w datapath as well as the necessary control objects</ins>. This is in conformance to the TC rule which states that: for TC datapaths which involve offloads it is required to introduce s/w twin before the h/w equivalent.
+### What Are These Patches?
+
+The posted series 1 patches[0] only introduce the <ins>s/w datapath as well as the necessary control objects</ins>. This is in conformance to the TC rule which states that: for TC datapaths which involve offloads it is required to introduce s/w twin before the h/w equivalent. The h/w offload patches are for a later series.
 
 # The Pushback
 
-Let me now provide a summary on the outstanding objections without going into the history to avoid relitigation (but as stated in the intro, the objection goal posts shifted many times). I will provide my responses to each the raised issues. If i have missed or mis-stated any of these raised points please let me know and i will fix the text.
+Let me now provide a summary on the outstanding objections without going into the history to avoid relitigation (but as stated in the intro, the objection goal posts shifted many times); however, post typing this article in if newer discussions bring up some old arguement for a pushback then i will update this document (and add a date annotation with a link).
+
+In the text below will provide my responses to each the raised issues. If i have missed or mis-stated any of these raised points please let me know and i will fix the text.
 
 ### 1a **Comment**: *"Use maps"*
 This has been brought up numerous times from all 3 people and here's a sample:[1]
 
-If you look at **Figure 1** above you will notice it doesnt make sense for our requirement. 1) eBPF is only in the picture for s/w datapath and can be removed while the h/w datapath continues to work fine. The control path, which accesses the objects, is for both h/w and s/w. If an operator wants a total offload then they dont need to load eBPF. 2) P4 tables require a lot more features that are not natural for maps and P4 has a lot more objects than things that can be *squeezed* into maps.
+If you look at **Figure 1** above you will notice it <ins>doesnt make sense for our requirement</ins>.
+
+1) eBPF is only in the picture for s/w datapath and can be removed while the h/w datapath continues to work fine. The control path, which accesses the objects, is for both h/w and s/w. If an operator wants a total offload then they dont need to load eBPF.
+2)  P4 tables require a lot more features that are not natural for maps and P4 has a lot more objects than things that can be *squeezed* into maps.
 
 For these reasons <ins>maps cannot be used</ins>.
 
@@ -63,7 +70,7 @@ Again see **Figure 1** and observe netlink use, the object sharing involved, and
 
 But lets say "you want to make it work with bpf system call", it would mean having one control path for s/w and another for offload; it will also mean keeping two sets of P4 object objects, one set in TC and one in eBPF. Then of course reinvent everything netlink offers for the s/w datapath.
 
-To put it crudely: Simply doesnt make sense.
+To put it crudely: <ins>Simply doesnt make sense</ins>.
 
 ### 2b **Comment**: *"but ... it is not performant"*
 
@@ -77,9 +84,11 @@ My response has always consistently been: performance is a lower priority to P4 
 
 ## 3 **Comment**: *"but you did it wrong, here's how you do it..."*
 
-If you kept up with the exchanges you will notice that this sentiment is a big theme in the exchanges and consumed most of the electrons!  The problem here is a lot of these strong opinions are being expressed as "expert opinions" when in fact it is just basic bikesheding[11].
+If you kept up with the exchanges you will notice that this sentiment is a big theme in the exchanges and consumed most of the electrons!  The problem here is a lot of these strong opinions are being expressed as "**expert opinions**" when in fact it is just basic bikesheding[11].
 
-Some sample space:  A lot of sometimes downright insulting comments like [3], sometimes misleading statements like "use tcx"[2] or just a gut-feel opinions not based on any solid reasoning or experience like "disagree with pipeline design"[1]. Often when these statements were made we would invest time and investigate if we could somehow compromise and use the expressed ideas/opinions but often it turned out to be a wild good chase and often if we  did "resolve" that "issue" another one "do it this way" comes up. See **Section #4c** for the a sample of such commentary...
+Some sample space:  A lot of sometimes downright insulting comments like [3], sometimes misleading statements like "use tcx"[2] or just a gut-feel opinions not based on any solid reasoning or experience like "disagree with pipeline design"[1]. Often when these statements were made we would invest time and investigate if we could somehow compromise and use the expressed ideas/opinions but often it turned out to be a wild goose chase and often if we  did "resolve" that "issue" another "do it this way" pops. See **Section #4c** for the a sample of such commentary...
+
+Update May 28/2024: Here's another **vision** summarized as "Dont Do this in the kernel"[12] ;->
 
 ## 4 **Comments** which bring us to the current stalemate...
 
@@ -103,6 +112,8 @@ More importantly note that our implementation is literally **copied from existin
   #**Response 4b**
 The conntrack code we copied from[5] **does not** free any memory allocated by kfunc used by the eBPF program. More importantly we would like to be in control of such policy decisions; example, one of the policies is keeping a table entry for a timeout period even after the eBPF program is gone (which is our current default behavior); or the eBPF program could be temporarily removed and a new version loaded using the same table (you dont want to be reloading a million entries at that point, etc). So dictating to us against our goal is frankly grasping for straws.
 
+Update May 28/2024: Oh and here's another directly being approved by Alexei[14]
+
   #**Response 4c**
  I am only highlighting this part to demonstrate what i have called *shifting-goal-posts* and also our willingness to compromise throughout this ordeal. For example, as stated earlier, we spent 9 months of multiple people effort moving away from our original implementation in V1 which did not use eBPF to one using eBPF[10]. As mentioned earlier, John and Daniel had very strong opinions objecting to the V1 patches at the time and insisted strongly we need to use eBPF.
 
@@ -111,11 +122,15 @@ In response to Paolo's request, we spent a week analyzing our code and building 
 
 Ok, so back in a cycle to **Comment #3**. We are doing it wrong and our design is broken ;->
 
+## 5 Nobody Really wants This
+
+Of course not true, we have had (still ongoing public) discussions and a long history (https://github.com/p4tc-dev/docs/blob/main/why-p4tc.md) involving multiple stake holders including vendors who support P4 abstractions in their NIC hardware. Unfortunately since we had to keep splaining this a few time it is worth to note it here as well. See the latest incarnation and see at least two very large vendors and someone very engaged in very large P4 projects explain why they need this[13a] [13b] [13c] - i think the other stake holders are confused on the kernel upstream politics and are tired of re-iterating their views (over and over and over).
+
 ## Now for a little rant
 
 I was hoping to be wrong with that effort in **comment #4c** but having gone through so many of these cycles of a) making changes to appease mostly and then b) after posting patches, another excuse surfaces. Rinse, Repeat. At this point, I am extremely skeptical that there is good faith on the other side.
 
-Open source is not a zero-sum game. EBPF already coexists with netfilter, tc, etc and various subsystems happily. I hope our requirement above is clear and i dont have to keep justifying why P4 is needed or point to the vendors producing P4 native NICs or relitigate over and over again why we need TC. Open source is about scratching your itch and our itch is totally contained within TC i.e we only use eBPF as infra.
+Open source is not a zero-sum game. EBPF already coexists with netfilter, tc, etc and various subsystems happily. I hope our requirements as stated above are clear and i dont have to keep justifying why P4 is needed or point to the vendors producing P4 native NICs or relitigate over and over again why we need TC. Open source is about scratching your itch and our itch is totally contained within TC i.e we only use eBPF as infra.
 
 On my skeptic side, which i wish to be proven wrong, I cant help but feel that this community is getting way too pervasive with politics and obscure agendas. I understand agendas, I just dont understand the zero-sum thinking. These nacks are, intended or not, pushing off a whole community with an itch to scratch away from Linux kernel (yes, there's a whole industry behind P4). Paolo  says he cant apply these patches because 3 people(who are not network or tc maintainers) nacked them - in my opinion with no technical backing ;-> I am afraid, by definition this is abuse of power (and i dont mean Paolo here)! At minimal it signifies lack of set of rules to contain abuse of power; before corporatization of Linux such containment was based on good faith and meritocracy-driven good intentions.
 
@@ -124,7 +139,7 @@ If this nacks are to block these patches then we are in unprecedented cross-subs
 # How do we move forward?
 
 I am not asking to be given speacial treatment but it is clear we have a hole in the process currently. All i am asking for is fair treatment.
-At this point, given that Paolo says the patches cant be applied because of 3 cross-subsystem <u>bogus</u> nacks, my suggestion on how we resolve this is for nnet maintainers to appoint a third person arbitrator. This person cannot be part of the TC or eBPF collective and has to be agreed to by both parties.
+At this point, given that Paolo says the patches **cant be applied** because of 3 cross-subsystem <u>bogus</u> nacks, my suggestion on how we resolve this is for net maintainers to **appoint a third person arbitrator**. This person cannot be part of the TC or eBPF collective and has to be agreed to by both parties.
 
 Hopefully this will introduce some new set of rules that will help the net maintainers resolve such issues should they surface in the future.
 
@@ -153,3 +168,14 @@ Hopefully this will introduce some new set of rules that will help the net maint
 [10] https://netdevconf.info/0x17/sessions/talk/integrating-ebpf-into-the-p4tc-datapath.html
 
 [11] http://phk.freebsd.dk/sagas/bikeshed/
+
+[12] https://lore.kernel.org/all/66566c7c6778d_52e720851@john.notmuch/
+
+[13a] https://lore.kernel.org/all/CO1PR11MB499350FC06A5B87E4C770CCE93F42@CO1PR11MB4993.namprd11.prod.outlook.com/#t
+
+[13b] https://lore.kernel.org/all/MW4PR12MB719209644426A0F5AE18D2E897F62@MW4PR12MB7192.namprd12.prod.outlook.com/
+
+[13c] https://lore.kernel.org/all/SN6PR17MB21102057A1745DBCBB101DBB96F42@SN6PR17MB2110.namprd17.prod.outlook.com/
+
+[14]  https://lore.kernel.org/all/CAADnVQJ_Wur5bmMsgOC7YvZ-D5GNzO9Fm2_4=L3eYkuQVpcg8g@mail.gmail.com/
+
