@@ -172,6 +172,8 @@ At this point, given that Paolo says the patches **cant be applied** because of 
 Hopefully this will introduce some new set of rules that will help the net maintainers resolve such issues should they surface in the future.
 
 
+# References
+
 [ref0]: https://lore.kernel.org/all/20240410140141.495384-1-jhs@mojatatu.com/
 
 [ref1]: https://lore.kernel.org/all/661444789fccf_49a6208ec@john.notmuch/
